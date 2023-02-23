@@ -1,0 +1,377 @@
+def load_airbnb():
+    airbnb = pd.read_csv("dataset/airbnb-listings_berlin.csv", delimiter=";")
+    return airbnb
+
+
+df = load_airbnb()
+df.head()
+df.info
+
+useless = ['ID', 'Listing Url', 'Scrape ID', 'Last Scraped', 'Name', 'Summary',
+           'Space', 'Description', 'Experiences Offered', 'Neighborhood Overview',
+           'Notes', 'Transit', 'Access', 'Interaction', 'House Rules',
+           'Thumbnail Url', 'Medium Url', 'Picture Url', 'XL Picture Url',
+           'Host ID', 'Host URL', 'Host Name', 'Host Since', 'Host Location',
+           'Host About', 'Host Response Time', 'Host Response Rate',
+           'Host Acceptance Rate', 'Host Thumbnail Url', 'Host Picture Url', 'Host Neighbourhood',
+           'Host Listings Count',
+           'Host Verifications', 'Street', 'Neighbourhood Cleansed', 'City', 'State', 'Market',
+           'Smart Location',
+           'Country Code', 'Country', 'Zipcode', 'Weekly Price', 'Monthly Price',
+           'Calendar last Scraped', 'Number of Reviews', 'First Review', 'Last Review', 'Neighbourhood',
+           'Review Scores Rating', 'Review Scores Accuracy',
+           'Review Scores Cleanliness', 'Review Scores Checkin', 'Review Scores Communication',
+           'Review Scores Location', 'Review Scores Value', 'License',
+           'Jurisdiction Names', 'Calculated host listings count', 'Reviews per Month', 'Geolocation',
+           'Features', 'Extra People', 'Has Availability',
+           'Square Feet', 'Host Total Listings Count', 'Latitude', 'Longitude', 'Amenities', 'Accommodates', 'Property Type', 'Maximum Nights',
+           'Calendar Updated', 'Availability 30', 'Availability 60', 'Availability 90', 'Availability 365', 'Cancellation Policy']
+
+df.drop(useless, axis=1, inplace=True)
+
+df.columns = df.columns.str.lower()
+df.columns = df.columns.str.replace(' ', '_')
+
+df.rename({'neighbourhood_group_cleansed': 'neighbourhood'}, axis=1, inplace=True)
+
+##############################################################################
+#################### Değişkenlerin value_counts bilgileri ####################
+##############################################################################
+
+for i in df.columns:
+    print(df[i].value_counts())
+    print('***************************************\n')
+
+
+###############################################################################
+#################### Data set hakkında genel kısa bilgiler ####################
+###############################################################################
+
+def check_df(df, head=5, tail=5):
+    print(" SHAPE ".center(60, '~'))
+    print('Observations -------> {}'.format(df.shape[0]))
+    print('Features     -------> {}'.format(df.shape[1]))
+    print("Shape of dataset: {df.shap)}")
+    print(" Types of Features ".center(60, '~'))
+    print(df.dtypes, "\n")
+    print(" Dataframe - Head ".center(60, '~'))
+    print("\n", df.head(head), "\n")
+    print(' Dataframe - TAIL '.center(60, '~'))
+    print("\n", df.tail(tail), "\n")
+    print(" Missing Values Analysis ".center(60, '~'))
+    print("\n", df.isnull().sum(), "\n")
+    print(' Duplicate Values Analysis '.center(60, '~'))
+    print("\n", df.duplicated().sum(), "\n")
+    print(" QUANTILES ".center(60, '~'))
+    print("\n", df.quantile([0, 0.05, 0.50, 0.95, 0.99, 1]).T, "\n")
+
+
+check_df(df)
+
+df[df.duplicated(keep=False)]
+print(df[df.duplicated(keep=False)].index)  # çoklama kayıt indeksleri
+df = df.drop_duplicates(keep='first')
+
+
+################################################################################
+################### Değişkenleri türlerine göre sınıflandırma ##################
+################################################################################
+
+def grab_col_names(dataframe, cat_th=10, car_th=30):
+    cat_cols = [col for col in df.columns if str(df[col].dtypes) in ["category", "object", "bool"]]
+    num_but_cat = [col for col in df.columns if df[col].nunique() < 10 and df[col].dtypes in ["int", "float"]]
+    cat_but_car = [col for col in df.columns if
+                   df[col].nunique() > 30 and str(df[col].dtypes) in ["category", "object"]]
+    cat_cols = cat_cols + num_but_cat
+    cat_cols = [col for col in cat_cols if col not in cat_but_car]
+
+    num_cols = [col for col in df.columns if df[col].dtypes in ["int", "float"]]
+    num_cols = [col for col in num_cols if col not in cat_cols]
+
+    print(f"Observations): {dataframe.shape[0]}")
+    print(f"Veriables): {dataframe.shape[1]}")
+    print(f"cat_cols): {len(cat_cols)}")
+    print(f"num_cols): {len(num_cols)}")
+    print(f"cat_but_car): {len(cat_but_car)}")
+    print(f"num_but_cat): {len(num_but_cat)}")
+
+    return cat_cols, num_cols, cat_but_car, num_but_cat
+
+
+cat_cols, num_cols, cat_but_car, num_but_cat = grab_col_names(df)
+
+
+################################################################################
+################ Numerik değişkenleri grafik halinde gözlemleme ################
+################################################################################
+
+def num_summary(dataframe, numerical_col, plot=False):
+    quantiles = [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90, 0.95, 0.99]
+    dataframe[numerical_col].describe().T
+    print(dataframe[numerical_col].describe(quantiles).T)
+
+    if plot:
+        sns.kdeplot(dataframe[numerical_col], shade=True, bw=0.5, color="purple")
+        plt.xlabel(numerical_col)
+        plt.title(numerical_col)
+        plt.show(block=True)
+
+
+for col in num_cols:
+    num_summary(df, col, plot=True)
+
+
+################################################################################
+############## Kategorik değişkenleri grafik halinde gözlemleme ################
+################################################################################
+
+def cat_summary(dataframe, col_name, plot=False):
+    if dataframe[col_name].dtypes == "bool": \
+            dataframe[col_name] = dataframe[col_name].astype(int)
+    print(pd.DataFrame({col_name: dataframe[col_name].value_counts(),
+                        "Ratio": 100 * dataframe[col_name].value_counts() / len(dataframe)}))
+    print("###########################################################")
+    if plot:
+        sns.countplot(x=dataframe[col_name], data=dataframe)
+        plt.show(block=True)
+    else:
+        print(pd.DataFrame({col_name: dataframe[col_name].value_counts(),
+                            "Ratio": 100 * dataframe[col_name].value_counts() / len(dataframe)}))
+        print("###########################################################")
+
+
+for col in cat_cols:
+    cat_summary(df, col, plot=True)
+
+####################################################################################################
+################### Hedef değişkenin numerik değişkenler ile çaprazlama incelenmesi ################
+####################################################################################################
+
+
+def target_summary_with_num(dataframe, target, numerical_col):
+    print(dataframe.groupby(target).agg({numerical_col: "mean"}), end="\n\n\n")
+
+
+for col in num_cols:
+    if col not in "price":
+        target_summary_with_num(df, "price", col)
+
+
+def target_summary_cat(dataframe, target, cat_cols, plot=True):
+    for col in cat_cols:
+        print(col, ":", len(dataframe[col].value_counts()))
+        print(pd.DataFrame({"COUNT": dataframe[col].value_counts(),
+                            "TARGET_MEAN": dataframe.groupby(col)[target].mean().sort_values()}), end="\n\n\n")
+        if plot:
+            explode = []
+            for i in range(len(dataframe[col].value_counts())):
+                explode.append(i * 0.05)
+            f, ax = plt.subplots(1, 2, figsize=(10, 4))
+            plt.rcParams['font.size'] = 6
+            dataframe[col].value_counts().plot.pie(explode=explode, autopct='%1.1f%%', ax=ax[0], shadow=True)
+            ax[0].set_title(f"Distribution of {col}", fontdict={"fontsize": 15})
+            ax[0].set_ylabel("")
+            sns.countplot(x=dataframe[col], data=dataframe, ax=ax[1])
+            plt.xticks(rotation=90)
+            ax[1].set_title(f"Distribution of {col}", fontdict={"fontsize": 15})
+            ax[1].set_xlabel("")
+            plt.tight_layout()
+            plt.show()
+
+
+target_summary_cat(df, "price", cat_cols)
+target_summary_cat(df, "price", cat_but_car)
+
+############################################################
+#################### Aykırı değer gözlemi ##################
+############################################################
+
+def outlier_thresholds(dataframe, variable):
+    quartile1 = dataframe[variable].quantile(0.05)
+    quartile3 = dataframe[variable].quantile(0.95)
+    interquantile_range = quartile3 - quartile1
+    up_limit = quartile3 + 1.5 * interquantile_range
+    low_limit = quartile1 - 1.5 * interquantile_range
+    return low_limit, up_limit
+
+
+def replace_with_thresholds(dataframe, variable):
+    low_limit, up_limit = outlier_thresholds(dataframe, variable)
+    # dataframe.loc[(dataframe[variable] < low_limit), variable] = low_limit
+    dataframe.loc[(dataframe[variable] > up_limit), variable] = up_limit
+
+
+def check_outlier_graph(dataframe, col_name, plot=False):
+    low_limit, up_limit = outlier_thresholds(dataframe, col_name)
+    if dataframe[(dataframe[col_name] > up_limit) | (dataframe[col_name] < low_limit)].any(axis=None):
+        print(True)
+        if plot:
+            sns.boxplot(dataframe[col_name])
+            plt.show(block=True)
+            print(dataframe[col_name])
+            print("###########################################################")
+    else:
+        print(False)
+        print(dataframe[col_name])
+        print("###########################################################")
+
+
+for col in num_cols:
+    check_outlier_graph(df, col, plot=True)
+
+for col in num_cols:
+    if col != "price":
+        print(col, replace_with_thresholds(df, col))
+
+
+############################################################
+################## Missing_values gözlemi ##################
+############################################################
+
+def missing_values_table(dataframe, na_name=False):
+    na_columns = [col for col in dataframe.columns if dataframe[col].isnull().sum() > 0]
+
+    n_miss = dataframe[na_columns].isnull().sum().sort_values(ascending=False)
+    ratio = (dataframe[na_columns].isnull().sum() / dataframe.shape[0] * 100).sort_values(ascending=False)
+    missing_df = pd.concat([n_miss, np.round(ratio, 2)], axis=1, keys=['n_miss', 'ratio'])
+    print(missing_df, end="\n")
+    msno.bar(df)
+    plt.show()
+    if na_name:
+        return na_columns
+
+
+missing_values_table(df, True)
+
+############################################################
+################# Korelasyon(Isı haritası) #################
+############################################################
+
+f, ax = plt.subplots(figsize=[14, 8])
+sns.heatmap(df[num_cols].corr(), annot=True, fmt=".2f")
+ax.set_title("Correlation Matrix", fontsize=25)
+plt.show(show=True)
+
+# Missing_values doldurma
+df.isnull().sum()
+df.info()
+
+################################################################################
+################# Toplam kaç tane eksik verimiz var ona bakalım ################
+################################################################################
+
+total_cells = np.product(df.shape)
+missing_values_count = df.isnull().sum()
+total_missing = missing_values_count.sum()
+# Eksik verilerin yüzde(%) olarak ne kadar olduğuna bakalım
+(total_missing / total_cells) * 100  # 5.10 boş değerimiz var
+
+############################################################
+################## Missing_values doldurma #################
+############################################################
+
+
+df.dropna(subset=["price"], inplace=True)
+df["bathrooms"].fillna(df["bathrooms"].median(), inplace=True)
+df["bedrooms"].fillna(df["bedrooms"].median(), inplace=True)
+df["beds"].fillna(df["beds"].median(), inplace=True)
+df['security_deposit'].fillna(0, inplace=True)
+df['cleaning_fee'].fillna(0, inplace=True)
+df.isnull().sum()
+
+
+##################################
+# BASE MODEL KURULUMU
+##################################
+dff = df.copy()
+dff.head(15)
+dff.shape
+
+cat_cols, num_cols, cat_but_car, num_but_cat = grab_col_names(dff)
+num_cols = [col for col in num_cols if "price" not in col]
+
+
+def one_hot_encoder(dataframe, categorical_cols, drop_first=False):
+    dataframe = pd.get_dummies(dataframe, columns=categorical_cols, drop_first=drop_first)
+    return dataframe
+
+
+dff = one_hot_encoder(dff, cat_cols, drop_first=True)
+
+#############################################
+# Standart Scaler
+#############################################
+
+scaler = StandardScaler()
+dff[num_cols] = scaler.fit_transform(dff[num_cols])
+
+dff[num_cols].head()
+
+dff.head()
+dff.shape
+
+
+y = dff['price']
+X = dff.drop(["price"], axis=1)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=17)
+
+def base_models(X, y, scoring="roc_auc"):
+    print("Base Models....")
+    models = [('LR', LinearRegression()),
+              # ("Ridge", Ridge()),
+              # ("Lasso", Lasso()),
+              # ("ElasticNet", ElasticNet()),
+              ('KNN', KNeighborsRegressor()),
+              ('CART', DecisionTreeRegressor()),
+              ('RF', RandomForestRegressor()),
+              # ('SVR', SVR()),
+              ('GBM', GradientBoostingRegressor()),
+              ("XGBoost", XGBRegressor(objective='reg:squarederror')),
+              ("LightGBM", LGBMRegressor())]
+    # ("CatBoost", CatBoostRegressor(verbose=False))]
+
+    for name, regressor in models:
+        rmse = np.mean(np.sqrt(-cross_val_score(regressor, X, y, cv=5, scoring="neg_mean_squared_error")))
+        print(f"RMSE: {round(rmse, 4)} ({name}) ")
+
+base_models(X, y, scoring="neg_mean_squared_error")
+
+KNeighborsRegressor.get_params
+LinearRegression.get_params
+LGBMRegressor.get_params
+
+
+"""
+Base Models....
+RMSE: 38.6992 (LR) 
+RMSE: 39.6095 (KNN) 
+RMSE: 47.3482 (CART) 
+RMSE: 38.3598 (RF) 
+RMSE: 37.5548 (GBM) 
+RMSE: 38.0074 (XGBoost) 
+RMSE: 36.2477 (LightGBM) 
+"""
+
+
+def plot_importance(model, features, num=len(X), save=False):
+
+    feature_imp = pd.DataFrame({"Value": model.feature_importances_, "Feature": features.columns})
+    plt.figure(figsize=(10, 10))
+    sns.set(font_scale=1)
+    sns.barplot(x="Value", y="Feature", data=feature_imp.sort_values(by="Value", ascending=False)[0:num])
+    plt.title("Features")
+    plt.tight_layout()
+    plt.show()
+    if save:
+        plt.savefig("importances.png")
+
+model = LGBMRegressor()
+model.fit(X, y)
+
+
+model.fit(X_train, y_train)
+
+y_pred = model.predict(X_test)
+
+plot_importance(model, X, save=True)
